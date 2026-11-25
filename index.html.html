@@ -1,0 +1,726 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>國小班級經營理論系統架構圖</title>
+  <!-- 載入 Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- 載入 Noto Sans TC 繁體中文字體 -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&display=swap" rel="stylesheet" />
+
+  <style>
+    /* 全局字體設定 */
+    body {
+      font-family: 'Noto Sans TC', 'Microsoft JhengHei', '微軟正黑體', sans-serif;
+      background-color: #f1f5f9;
+      color: #1e293b;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* 可編輯文字區塊的互動提示樣式 */
+    [contenteditable="true"] {
+      outline: none;
+      border-radius: 6px;
+      transition: background-color 0.18s ease, box-shadow 0.18s ease;
+      cursor: text;
+    }
+
+    [contenteditable="true"]:hover {
+      box-shadow: 0 0 0 1.5px rgba(99, 102, 241, 0.45);
+      background-color: rgba(255, 255, 255, 0.72);
+    }
+
+    [contenteditable="true"]:focus {
+      box-shadow: 0 0 0 2px #4f46e5;
+      background-color: #ffffff;
+    }
+
+    /* 橫幅淺色文字在懸停／編輯時保持對比度 */
+    .spectrum-editable:hover {
+      box-shadow: 0 0 0 1.5px rgba(255, 255, 255, 0.85);
+      background-color: rgba(255, 255, 255, 0.16);
+    }
+
+    .spectrum-editable:focus {
+      box-shadow: 0 0 0 2px #ffffff;
+      background-color: rgba(15, 23, 42, 0.35);
+    }
+
+    /* 雙向水平箭頭光譜橫幅 */
+    .spectrum-banner {
+      position: relative;
+      background: linear-gradient(90deg, #e86f68 0%, #eab364 35%, #5db893 68%, #5468b8 100%);
+      margin: 0 18px;
+      border-radius: 6px;
+    }
+
+    .spectrum-banner::before,
+    .spectrum-banner::after {
+      content: '';
+      position: absolute;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 0;
+      height: 0;
+      border-style: solid;
+    }
+
+    /* 左側箭頭尖端 */
+    .spectrum-banner::before {
+      left: -17px;
+      border-width: 24px 18px 24px 0;
+      border-color: transparent #e86f68 transparent transparent;
+    }
+
+    /* 右側箭頭尖端 */
+    .spectrum-banner::after {
+      right: -17px;
+      border-width: 24px 0 24px 18px;
+      border-color: transparent transparent transparent #5468b8;
+    }
+
+    /* 卡片刪除鈕微動畫 */
+    .theory-card .delete-btn {
+      opacity: 0;
+      transform: scale(0.9);
+      transition: opacity 0.16s ease, transform 0.16s ease, background-color 0.16s ease;
+    }
+
+    .theory-card:hover .delete-btn,
+    .theory-card:focus-within .delete-btn {
+      opacity: 1;
+      transform: scale(1);
+    }
+
+    /* 觸控裝置（無 hover）時顯示淡淡刪除鈕方便操作 */
+    @media (hover: none) {
+      .theory-card .delete-btn {
+        opacity: 0.75;
+        transform: scale(1);
+      }
+    }
+
+    /* 列印與另存 PDF 專用樣式 */
+    @media print {
+      @page {
+        size: landscape;
+        margin: 10mm;
+      }
+
+      body {
+        background-color: #ffffff !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+      }
+
+      .no-print {
+        display: none !important;
+      }
+
+      #diagram-canvas {
+        box-shadow: none !important;
+        border: none !important;
+        max-width: 100% !important;
+        width: 100% !important;
+        padding: 8px 12px !important;
+        margin: 0 !important;
+      }
+
+      /* 列印時強制維持四欄並排 */
+      #columns-grid {
+        display: grid !important;
+        grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+        gap: 14px !important;
+      }
+
+      [contenteditable="true"] {
+        box-shadow: none !important;
+      }
+    }
+  </style>
+</head>
+<body class="min-h-screen py-5 px-3 sm:px-6">
+
+  <!-- 頂部互動工具列（列印時自動隱藏） -->
+  <header class="no-print max-w-[1200px] mx-auto mb-4 bg-white/95 backdrop-blur border border-slate-200 rounded-2xl shadow-sm px-4 py-3 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-3">
+    <!-- 左側操作提示 -->
+    <div class="flex items-center gap-2 text-sm text-slate-600">
+      <span class="inline-flex items-center justify-center w-7 h-7 rounded-full bg-amber-100 text-amber-700 text-base shrink-0">💡</span>
+      <span><strong class="text-slate-800">點擊圖表中任何文字</strong>即可直接修改內容（系統會自動儲存您的編輯）</span>
+    </div>
+
+    <!-- 右側功能按鈕群 -->
+    <div class="flex flex-wrap items-center gap-2 w-full lg:w-auto justify-start lg:justify-end">
+      <!-- 快速新增卡片選單與按鈕 -->
+      <div class="inline-flex items-center rounded-xl border border-indigo-200 bg-indigo-50/70 p-0.5">
+        <select id="quick-add-col" aria-label="選擇要新增卡片的欄位" class="bg-transparent text-xs sm:text-sm font-medium text-indigo-800 pl-2.5 pr-1 py-1.5 focus:outline-none cursor-pointer">
+          <option value="0">1. 介入取向</option>
+          <option value="1">2. 互動取向</option>
+          <option value="2">3. 非介入取向</option>
+          <option value="3">4. 系統與社群</option>
+        </select>
+        <button type="button" onclick="quickAddCard()" class="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 active:scale-[0.99] text-white text-xs sm:text-sm font-medium transition shadow-xs">
+          <span>＋ 新增理論卡片</span>
+        </button>
+      </div>
+
+      <!-- 複製純文字大綱 -->
+      <button type="button" onclick="copyOutline()" class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs sm:text-sm font-medium transition shadow-xs">
+        <svg class="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+          <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+        </svg>
+        <span>複製純文字大綱</span>
+      </button>
+
+      <!-- 列印 / 另存 PDF -->
+      <button type="button" onclick="window.print()" class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-900 text-white text-xs sm:text-sm font-medium transition shadow-xs">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <polyline points="6 9 6 2 18 2 18 9"></polyline>
+          <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
+          <rect x="6" y="14" width="12" height="8"></rect>
+        </svg>
+        <span>列印 / 另存 PDF</span>
+      </button>
+
+      <!-- 還原預設內容 -->
+      <button type="button" onclick="openResetModal()" class="inline-flex items-center gap-1 px-3 py-2 rounded-xl border border-rose-200 bg-rose-50/60 hover:bg-rose-100 text-rose-700 text-xs sm:text-sm font-medium transition">
+        <span>還原預設內容</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- 白色畫布主卡片（最大寬度 1200px） -->
+  <main id="diagram-canvas" class="max-w-[1200px] mx-auto bg-white rounded-3xl shadow-md border border-slate-200/80 p-5 sm:p-8 lg:p-10">
+    
+    <!-- 主標題 -->
+    <div class="text-center mb-6">
+      <h1 id="main-title" contenteditable="true" spellcheck="false" class="inline-block text-2xl sm:text-3xl lg:text-4xl font-black tracking-wide text-slate-800 px-3 py-1">
+        國小班級經營理論系統架構圖
+      </h1>
+    </div>
+
+    <!-- 上方橫軸：師生權力與控制光譜雙向箭頭橫幅 -->
+    <section aria-label="師生權力與控制光譜" class="mb-7">
+      <div class="spectrum-banner min-h-[48px] px-3 sm:px-6 py-2 flex flex-col sm:flex-row items-center justify-between gap-1.5 text-white font-bold shadow-xs">
+        <div id="spectrum-left" contenteditable="true" spellcheck="false" class="spectrum-editable text-xs sm:text-sm lg:text-base px-2 py-0.5 text-center sm:text-left">
+          高控制（教師主導）
+        </div>
+        <div id="spectrum-center" contenteditable="true" spellcheck="false" class="spectrum-editable text-sm sm:text-base lg:text-lg tracking-wider px-2 py-0.5 text-center">
+          ◄──── 師生權力與控制光譜 ────►
+        </div>
+        <div id="spectrum-right" contenteditable="true" spellcheck="false" class="spectrum-editable text-xs sm:text-sm lg:text-base px-2 py-0.5 text-center sm:text-right">
+          低控制（學生中心）
+        </div>
+      </div>
+    </section>
+
+    <!-- 中間四個並排直欄（等寬響應式 Grid） -->
+    <section id="columns-grid" aria-label="四大理論取向分類" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-5 mb-7 items-stretch">
+      <!-- 由 JavaScript 動態渲染四個直欄 -->
+    </section>
+
+    <!-- 底部橫向流程列：實務三道防線 -->
+    <section aria-label="實務三道防線" class="bg-slate-100/90 border border-slate-200/80 rounded-2xl px-4 sm:px-6 py-4">
+      <div class="flex flex-col lg:flex-row items-center justify-center gap-2.5 sm:gap-3 flex-wrap">
+        <span id="defense-prefix" contenteditable="true" spellcheck="false" class="text-base sm:text-lg font-extrabold text-slate-800 px-2 py-0.5">
+          實務三道防線：
+        </span>
+
+        <div id="defense-steps-container" class="flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-2.5 flex-wrap w-full lg:w-auto">
+          <!-- 由 JavaScript 動態渲染三個可編輯步驟標籤 -->
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- 底部輔助概念小卡：特別白話解析「4. 系統與社群取向」（列印時自動隱藏） -->
+  <section class="no-print max-w-[1200px] mx-auto mt-5 bg-indigo-50/70 border border-indigo-200/80 rounded-2xl p-5 sm:p-6 text-slate-700">
+    <div class="flex items-start gap-3">
+      <span class="inline-flex items-center justify-center w-8 h-8 rounded-xl bg-indigo-600 text-white font-bold text-sm shrink-0 mt-0.5">解說</span>
+      <div class="space-y-2 text-sm sm:text-base leading-relaxed">
+        <h2 class="font-bold text-indigo-950 text-base sm:text-lg">為什麼第 4 欄「系統與社群取向」獨立在傳統控制光譜之外？</h2>
+        <p>
+          前 3 欄（介入、互動、非介入）討論的都是<strong>「老師個人在教室裡，要管得多緊或多鬆」</strong>（師生一對一的權力拔河）；但第 4 欄的視角拉高到<strong>「整個環境系統」與「同儕關係網絡」</strong>，不把問題全算在學生頭上，也不只靠老師單打獨鬥：
+        </p>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
+          <div class="bg-white/90 rounded-xl p-3.5 border border-indigo-100">
+            <div class="font-bold text-indigo-900 mb-1">① 正向行為支持（PBS）＝ 調整環境系統</div>
+            <p class="text-xs sm:text-sm text-slate-600">
+              先問「是不是環境設計讓孩子容易出錯？」（例如走廊沒動線才奔跑、題目太難才尖叫），透過<strong>全校／全班環境調整</strong>與教導替代行為（如舉求助卡）來預防問題。
+            </p>
+          </div>
+          <div class="bg-white/90 rounded-xl p-3.5 border border-indigo-100">
+            <div class="font-bold text-indigo-900 mb-1">② 修復式正義 ＝ 修補社群關係</div>
+            <p class="text-xs sm:text-sm text-slate-600">
+              衝突發生時，重點不是「老師要怎麼罰他」，而是把焦點放回<strong>人與人之間的傷害</strong>，透過安全對話讓雙方理解彼此感受，共同商議如何彌補與和好。
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 自訂還原預設確認 Modal（取代原生 confirm） -->
+  <div id="reset-modal" class="no-print fixed inset-0 z-50 hidden items-center justify-center bg-slate-900/45 backdrop-blur-xs p-4">
+    <div class="bg-white rounded-2xl shadow-xl border border-slate-200 max-w-sm w-full p-6 space-y-4">
+      <div class="flex items-center gap-2.5 text-rose-600">
+        <span class="inline-flex items-center justify-center w-9 h-9 rounded-full bg-rose-100 text-lg">⚠️</span>
+        <h3 class="text-lg font-bold text-slate-800">確定要還原預設內容嗎？</h3>
+      </div>
+      <p class="text-sm text-slate-600 leading-relaxed">
+        這將會清除您目前在架構圖中修改的文字與新增／刪除的卡片，並恢復成初始的 12 個國小班級經營理論架構。
+      </p>
+      <div class="flex items-center justify-end gap-2 pt-2">
+        <button type="button" onclick="closeResetModal()" class="px-4 py-2 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 text-sm font-medium transition">
+          取消
+        </button>
+        <button type="button" onclick="confirmReset()" class="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-sm font-medium transition shadow-xs">
+          確定還原
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 輕量 Toast 提示框 -->
+  <div id="toast" class="no-print fixed bottom-5 left-1/2 -translate-x-1/2 z-50 pointer-events-none opacity-0 transition-all duration-200 translate-y-2 bg-slate-800 text-white text-sm font-medium px-4 py-2.5 rounded-xl shadow-lg flex items-center gap-2">
+    <span id="toast-msg">已儲存變更</span>
+  </div>
+
+  <script>
+    // 儲存於 localStorage 的鍵值
+    const STORAGE_KEY = 'elementary_classroom_management_diagram_v1';
+
+    // 預設架構圖資料結構
+    const DEFAULT_DATA = {
+      mainTitle: '國小班級經營理論系統架構圖',
+      spectrumLeft: '高控制（教師主導）',
+      spectrumCenter: '◄──── 師生權力與控制光譜 ────►',
+      spectrumRight: '低控制（學生中心）',
+      columns: [
+        {
+          id: 'col-1',
+          title: '1. 介入取向（高控制）',
+          headerBg: '#e86f68',     // 柔和珊瑚紅
+          bodyBg: '#fdf2f1',
+          borderColor: '#f6d5d3',
+          btnText: '#b8433c',
+          btnHoverBg: '#fae3e1',
+          cards: [
+            '行為改變技術（史金納）',
+            '果斷紀律（肯特夫婦）',
+            '正向管教（瓊斯）'
+          ]
+        },
+        {
+          id: 'col-2',
+          title: '2. 互動取向（中控制）',
+          headerBg: '#eab354',     // 柔和琥珀黃
+          bodyBg: '#fdf8ee',
+          borderColor: '#f5e4c3',
+          btnText: '#9c6b19',
+          btnHoverBg: '#faefd9',
+          cards: [
+            '教學管理（庫寧）',
+            '民主教學（德瑞克斯）',
+            '合作紀律（艾伯特）',
+            '選擇理論（葛拉瑟）'
+          ]
+        },
+        {
+          id: 'col-3',
+          title: '3. 非介入取向（低控制）',
+          headerBg: '#5eb892',     // 柔和薄荷綠
+          bodyBg: '#f0f9f5',
+          borderColor: '#ccebdc',
+          btnText: '#2c7a59',
+          btnHoverBg: '#dcf2e7',
+          cards: [
+            '和諧溝通（吉諾特）',
+            '教師效能訓練（戈登）',
+            '人本主義（羅傑斯）'
+          ]
+        },
+        {
+          id: 'col-4',
+          title: '4. 系統與社群取向',
+          headerBg: '#5a6eb8',     // 柔和靛藍色
+          bodyBg: '#f1f3fa',
+          borderColor: '#d3daf0',
+          btnText: '#3b4d91',
+          btnHoverBg: '#e1e6f7',
+          cards: [
+            '正向行為支持 PBS（蘇蓋、霍納）',
+            '修復式正義（澤爾）'
+          ]
+        }
+      ],
+      defensePrefix: '實務三道防線：',
+      defenseSteps: [
+        '① 事前預防（建立常規）',
+        '② 事中介入（低干擾止血）',
+        '③ 事後修復（責任與關係）'
+      ]
+    };
+
+    // 深拷貝輔助函式
+    function cloneDefaultData() {
+      return JSON.parse(JSON.stringify(DEFAULT_DATA));
+    }
+
+    // 從 localStorage 載入資料（含安全錯誤處理）
+    function loadState() {
+      try {
+        const saved = localStorage.getItem(STORAGE_KEY);
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (parsed && Array.isArray(parsed.columns) && parsed.columns.length === 4) {
+            return parsed;
+          }
+        }
+      } catch (err) {
+        console.warn('無法讀取 localStorage，將使用預設資料：', err);
+      }
+      return cloneDefaultData();
+    }
+
+    let state = loadState();
+
+    // 將目前狀態寫入 localStorage
+    function saveState() {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+      } catch (err) {
+        console.warn('無法寫入 localStorage：', err);
+      }
+    }
+
+    // 防止貼上時帶入外部 HTML 富文本格式，統一轉純文字
+    function handlePlainPaste(e) {
+      e.preventDefault();
+      const text = (e.clipboardData || window.clipboardData).getData('text/plain');
+      document.execCommand('insertText', false, text);
+    }
+
+    // 渲染完整架構圖
+    function renderDiagram() {
+      // 1. 渲染主標題與上方光譜文字
+      const mainTitleEl = document.getElementById('main-title');
+      const specLeftEl = document.getElementById('spectrum-left');
+      const specCenterEl = document.getElementById('spectrum-center');
+      const specRightEl = document.getElementById('spectrum-right');
+
+      mainTitleEl.textContent = state.mainTitle;
+      specLeftEl.textContent = state.spectrumLeft;
+      specCenterEl.textContent = state.spectrumCenter;
+      specRightEl.textContent = state.spectrumRight;
+
+      // 2. 渲染四個直欄
+      const gridEl = document.getElementById('columns-grid');
+      gridEl.innerHTML = '';
+
+      state.columns.forEach((col, colIndex) => {
+        const colWrapper = document.createElement('div');
+        colWrapper.className = 'flex flex-col rounded-2xl overflow-hidden shadow-xs transition-shadow';
+        colWrapper.style.backgroundColor = col.bodyBg;
+        colWrapper.style.border = `1.5px solid ${col.borderColor}`;
+
+        // 直欄頂部彩色標題列
+        const headerDiv = document.createElement('div');
+        headerDiv.className = 'px-3.5 py-3 text-center text-white font-bold text-base sm:text-lg shadow-2xs';
+        headerDiv.style.backgroundColor = col.headerBg;
+
+        const titleSpan = document.createElement('div');
+        titleSpan.contentEditable = 'true';
+        titleSpan.spellcheck = false;
+        titleSpan.className = 'spectrum-editable px-1.5 py-0.5 leading-snug';
+        titleSpan.textContent = col.title;
+        titleSpan.addEventListener('paste', handlePlainPaste);
+        titleSpan.addEventListener('input', () => {
+          state.columns[colIndex].title = titleSpan.textContent.trim();
+          saveState();
+          syncQuickAddOptions();
+        });
+
+        headerDiv.appendChild(titleSpan);
+        colWrapper.appendChild(headerDiv);
+
+        // 直欄內容區（理論卡片列表）
+        const bodyDiv = document.createElement('div');
+        bodyDiv.className = 'flex-1 p-3.5 flex flex-col gap-3 justify-between';
+
+        const cardsList = document.createElement('div');
+        cardsList.className = 'flex flex-col gap-2.5';
+
+        col.cards.forEach((cardText, cardIndex) => {
+          const cardEl = document.createElement('div');
+          cardEl.className = 'theory-card relative group bg-white rounded-xl px-3.5 py-3.5 shadow-xs border border-slate-200/75 flex items-center justify-center text-center min-h-[54px] transition hover:shadow-sm';
+
+          // 可編輯卡片文字
+          const textDiv = document.createElement('div');
+          textDiv.contentEditable = 'true';
+          textDiv.spellcheck = false;
+          textDiv.className = 'w-full font-bold text-slate-800 text-sm sm:text-[15px] leading-snug px-2 py-0.5';
+          textDiv.textContent = cardText;
+          textDiv.addEventListener('paste', handlePlainPaste);
+          textDiv.addEventListener('input', () => {
+            state.columns[colIndex].cards[cardIndex] = textDiv.textContent;
+            saveState();
+          });
+
+          // 右上角刪除鈕（滑鼠懸停顯示，列印時隱藏）
+          const delBtn = document.createElement('button');
+          delBtn.type = 'button';
+          delBtn.title = '刪除此卡片';
+          delBtn.setAttribute('aria-label', '刪除此卡片');
+          delBtn.className = 'delete-btn no-print absolute -top-2 -right-2 w-6 h-6 rounded-full bg-rose-500 hover:bg-rose-600 text-white text-xs font-bold flex items-center justify-center shadow-sm cursor-pointer';
+          delBtn.textContent = '×';
+          delBtn.addEventListener('click', () => {
+            deleteCard(colIndex, cardIndex);
+          });
+
+          cardEl.appendChild(textDiv);
+          cardEl.appendChild(delBtn);
+          cardsList.appendChild(cardEl);
+        });
+
+        bodyDiv.appendChild(cardsList);
+
+        // 直欄底部「+ 新增卡片」按鈕（列印時自動隱藏）
+        const addBtn = document.createElement('button');
+        addBtn.type = 'button';
+        addBtn.className = 'no-print mt-2 w-full py-2 px-3 rounded-xl border border-dashed text-xs sm:text-sm font-semibold transition flex items-center justify-center gap-1 cursor-pointer';
+        addBtn.style.borderColor = col.headerBg;
+        addBtn.style.color = col.btnText;
+        addBtn.innerHTML = '<span>＋</span><span>新增卡片</span>';
+        addBtn.addEventListener('mouseenter', () => {
+          addBtn.style.backgroundColor = col.btnHoverBg;
+        });
+        addBtn.addEventListener('mouseleave', () => {
+          addBtn.style.backgroundColor = 'transparent';
+        });
+        addBtn.addEventListener('click', () => {
+          addCardToColumn(colIndex);
+        });
+
+        bodyDiv.appendChild(addBtn);
+        colWrapper.appendChild(bodyDiv);
+        gridEl.appendChild(colWrapper);
+      });
+
+      // 3. 渲染底部三道防線
+      const defensePrefixEl = document.getElementById('defense-prefix');
+      defensePrefixEl.textContent = state.defensePrefix;
+
+      const stepsContainer = document.getElementById('defense-steps-container');
+      stepsContainer.innerHTML = '';
+
+      state.defenseSteps.forEach((stepText, stepIdx) => {
+        const pill = document.createElement('div');
+        pill.contentEditable = 'true';
+        pill.spellcheck = false;
+        pill.className = 'bg-white border border-slate-200/90 shadow-2xs rounded-xl px-3.5 py-2 text-sm sm:text-[15px] font-bold text-slate-800 text-center';
+        pill.textContent = stepText;
+        pill.addEventListener('paste', handlePlainPaste);
+        pill.addEventListener('input', () => {
+          state.defenseSteps[stepIdx] = pill.textContent.trim();
+          saveState();
+        });
+
+        stepsContainer.appendChild(pill);
+
+        // 在步驟之間加入箭頭符號
+        if (stepIdx < state.defenseSteps.length - 1) {
+          const arrow = document.createElement('span');
+          arrow.className = 'text-slate-500 font-bold text-base select-none rotate-90 sm:rotate-0';
+          arrow.textContent = '➔';
+          stepsContainer.appendChild(arrow);
+        }
+      });
+
+      syncQuickAddOptions();
+    }
+
+    // 同步頂部快速新增下拉選單的欄位名稱
+    function syncQuickAddOptions() {
+      const selectEl = document.getElementById('quick-add-col');
+      if (!selectEl) return;
+      state.columns.forEach((col, idx) => {
+        if (selectEl.options[idx]) {
+          selectEl.options[idx].textContent = col.title || `第 ${idx + 1} 欄`;
+        }
+      });
+    }
+
+    // 新增理論卡片至指定欄位，並自動聚焦進入編輯狀態
+    function addCardToColumn(colIndex) {
+      state.columns[colIndex].cards.push('新理論名稱（學者）');
+      saveState();
+      renderDiagram();
+
+      // 自動聚焦並全選剛新增的卡片文字，方便使用者直接打字替換
+      const gridEl = document.getElementById('columns-grid');
+      const targetCol = gridEl.children[colIndex];
+      if (targetCol) {
+        const editableCards = targetCol.querySelectorAll('.theory-card [contenteditable="true"]');
+        const lastCard = editableCards[editableCards.length - 1];
+        if (lastCard) {
+          lastCard.focus();
+          const range = document.createRange();
+          range.selectNodeContents(lastCard);
+          const sel = window.getSelection();
+          sel.removeAllRanges();
+          sel.addRange(range);
+        }
+      }
+      showToast('已新增卡片，請直接輸入理論名稱');
+    }
+
+    // 頂部工具列快速新增卡片
+    function quickAddCard() {
+      const selectEl = document.getElementById('quick-add-col');
+      const colIndex = parseInt(selectEl.value, 10) || 0;
+      addCardToColumn(colIndex);
+    }
+
+    // 刪除指定卡片
+    function deleteCard(colIndex, cardIndex) {
+      state.columns[colIndex].cards.splice(cardIndex, 1);
+      saveState();
+      renderDiagram();
+      showToast('已移除該張理論卡片');
+    }
+
+    // 複製純文字大綱（使用 execCommand 相容 iframe 環境）
+    function copyOutline() {
+      const lines = [];
+      lines.push(`【${state.mainTitle.trim()}】`);
+      lines.push(`光譜軸線：${state.spectrumLeft.trim()}  ${state.spectrumCenter.trim()}  ${state.spectrumRight.trim()}`);
+      lines.push('');
+
+      state.columns.forEach((col) => {
+        lines.push(`■ ${col.title.trim()}`);
+        if (col.cards.length === 0) {
+          lines.push('  （尚無理論卡片）');
+        } else {
+          col.cards.forEach((card) => {
+            const cleanCard = card.trim();
+            if (cleanCard) {
+              lines.push(`  • ${cleanCard}`);
+            }
+          });
+        }
+        lines.push('');
+      });
+
+      lines.push(`${state.defensePrefix.trim()} ${state.defenseSteps.map(s => s.trim()).join(' ➔ ')}`);
+
+      const outputText = lines.join('\n');
+
+      const textarea = document.createElement('textarea');
+      textarea.value = outputText;
+      textarea.style.position = 'fixed';
+      textarea.style.opacity = '0';
+      document.body.appendChild(textarea);
+      textarea.select();
+
+      try {
+        document.execCommand('copy');
+        showToast('✅ 已複製純文字大綱至剪貼簿！');
+      } catch (err) {
+        showToast('⚠️ 複製失敗，請手動選取文字複製');
+      } finally {
+        document.body.removeChild(textarea);
+      }
+    }
+
+    // 開啟／關閉還原確認對話框
+    function openResetModal() {
+      const modal = document.getElementById('reset-modal');
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+    }
+
+    function closeResetModal() {
+      const modal = document.getElementById('reset-modal');
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
+    }
+
+    function confirmReset() {
+      state = cloneDefaultData();
+      saveState();
+      renderDiagram();
+      closeResetModal();
+      showToast('🔄 已還原為預設架構內容');
+    }
+
+    // 顯示輕量 Toast 通知
+    let toastTimer = null;
+    function showToast(message) {
+      const toastEl = document.getElementById('toast');
+      const msgEl = document.getElementById('toast-msg');
+      msgEl.textContent = message;
+
+      toastEl.classList.remove('opacity-0', 'translate-y-2');
+      toastEl.classList.add('opacity-100', 'translate-y-0');
+
+      if (toastTimer) clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => {
+        toastEl.classList.add('opacity-0', 'translate-y-2');
+        toastEl.classList.remove('opacity-100', 'translate-y-0');
+      }, 2400);
+    }
+
+    // 綁定固定標題與光譜文字的即時儲存監聽器
+    function bindStaticEditables() {
+      const mainTitleEl = document.getElementById('main-title');
+      const specLeftEl = document.getElementById('spectrum-left');
+      const specCenterEl = document.getElementById('spectrum-center');
+      const specRightEl = document.getElementById('spectrum-right');
+      const defensePrefixEl = document.getElementById('defense-prefix');
+
+      [mainTitleEl, specLeftEl, specCenterEl, specRightEl, defensePrefixEl].forEach((el) => {
+        el.addEventListener('paste', handlePlainPaste);
+      });
+
+      mainTitleEl.addEventListener('input', () => {
+        state.mainTitle = mainTitleEl.textContent.trim();
+        saveState();
+      });
+
+      specLeftEl.addEventListener('input', () => {
+        state.spectrumLeft = specLeftEl.textContent.trim();
+        saveState();
+      });
+
+      specCenterEl.addEventListener('input', () => {
+        state.spectrumCenter = specCenterEl.textContent.trim();
+        saveState();
+      });
+
+      specRightEl.addEventListener('input', () => {
+        state.spectrumRight = specRightEl.textContent.trim();
+        saveState();
+      });
+
+      defensePrefixEl.addEventListener('input', () => {
+        state.defensePrefix = defensePrefixEl.textContent.trim();
+        saveState();
+      });
+    }
+
+    // 初始化應用程式
+    window.addEventListener('DOMContentLoaded', () => {
+      bindStaticEditables();
+      renderDiagram();
+    });
+  </script>
+</body>
+</html>
